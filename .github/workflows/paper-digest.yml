@@ -60,5 +60,4 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
           TZ: Asia/Shanghai
-          PAPER_DIGEST_TEST: ${{ github.event_name == 'push' && '1' || '0' }}
         run: python scripts/paper_digest.py

@@ -21,8 +21,6 @@ FROM_DATE = TODAY - timedelta(days=365)
 ROOT = Path(__file__).resolve().parents[1]
 EXCLUDED_FILE = ROOT / ".paper_watch" / "excluded_dois.txt"
 ISSUE_PREFIX = "[论文日报]"
-TEST_MODE = os.getenv("PAPER_DIGEST_TEST") == "1"
-TEST_SUFFIX = "（云端摘要验证2）" if TEST_MODE else ""
 PROJECT = "面向智能体办公安全的检测与防御系统"
 
 VENUE_RULES = [
@@ -457,7 +455,7 @@ def issue_body(items: list[dict], token: str | None) -> str:
 
 
 def create_issue(items: list[dict], token: str, repo: str, owner: str):
-    title = f"{ISSUE_PREFIX} {TODAY.isoformat()}｜智能体办公安全" + TEST_SUFFIX
+    title = f"{ISSUE_PREFIX} {TODAY.isoformat()}｜智能体办公安全"
     body = issue_body(items, token)
     payload = {"title": title, "body": body, "assignees": [owner]}
     try:
@@ -502,7 +500,7 @@ def main():
         print("No new eligible papers were found.")
         return
 
-    issue_title = f"{ISSUE_PREFIX} {TODAY.isoformat()}｜智能体办公安全" + TEST_SUFFIX
+    issue_title = f"{ISSUE_PREFIX} {TODAY.isoformat()}｜智能体办公安全"
     if issue_title in titles:
         print(f"Issue already exists: {issue_title}")
         return
