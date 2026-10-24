@@ -21,6 +21,7 @@ FROM_DATE = TODAY - timedelta(days=365)
 ROOT = Path(__file__).resolve().parents[1]
 EXCLUDED_FILE = ROOT / ".paper_watch" / "excluded_dois.txt"
 ISSUE_PREFIX = "[论文日报]"
+TEST_MODE = os.getenv("PAPER_DIGEST_TEST") == "1"
 PROJECT = "面向智能体办公安全的检测与防御系统"
 
 VENUE_RULES = [
@@ -292,7 +293,7 @@ def recent_issue_state(token: str, repo: str):
     return titles, excluded
 
 
-def model_summary(items: list[dict], token: str) -> str | None:
+def model_summary(items: list[dict]) -> str | None:
     compact = [
         {
             "index": index,
@@ -302,7 +303,7 @@ def model_summary(items: list[dict], token: str) -> str | None:
             "publication_date": item["publication_date"],
             "doi": item["doi"],
             "url": item["url"],
-            "abstract": item["abstract"][:6000],
+            "abstract": item["abstract"][:5500],
             "matched_terms": item["matched_terms"],
         }
         for index, item in enumerate(items, start=1)
@@ -318,35 +319,39 @@ def model_summary(items: list[dict], token: str) -> str | None:
 6. 输出直接为 Markdown 正文，不要加代码围栏。
 """
     payload = {
-        "model": "openai/gpt-4.1-mini",
+        "model": os.getenv("OLLAMA_MODEL", "qwen2.5:1.5b"),
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": json.dumps(compact, ensure_ascii=False, indent=2)},
         ],
-        "temperature": 0.2,
-        "max_tokens": 5000,
+        "stream": False,
+        "options": {
+            "temperature": 0.15,
+            "num_ctx": 8192,
+            "num_predict": 2600,
+        },
     }
-    for model in ("openai/gpt-4.1-mini", "openai/gpt-4o-mini", "openai/gpt-4.1"):
-        payload["model"] = model
+    url = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434") + "/api/chat"
+    for attempt in range(2):
         try:
             req = urllib.request.Request(
-                "https://models.github.ai/inference/chat/completions",
+                url,
                 data=json.dumps(payload).encode("utf-8"),
                 method="POST",
                 headers={
-                    "Authorization": f"Bearer {token}",
                     "Accept": "application/json",
                     "Content-Type": "application/json",
                     "User-Agent": "lion636-paper-digest/1.0",
                 },
             )
-            with urllib.request.urlopen(req, timeout=90) as response:
+            with urllib.request.urlopen(req, timeout=300) as response:
                 data = json.loads(response.read().decode("utf-8"))
-            content = data["choices"][0]["message"]["content"].strip()
+            content = (data.get("message") or {}).get("content", "").strip()
             if content:
                 return content
         except Exception as exc:
-            print(f"warning: model {model} failed: {exc}", file=sys.stderr)
+            print(f"warning: local model attempt {attempt + 1} failed: {exc}", file=sys.stderr)
+            time.sleep(3)
     return None
 
 
@@ -356,7 +361,7 @@ def fallback_summary(items: list[dict]) -> str:
         "",
         f"项目：**{PROJECT}**",
         "",
-        f"检索窗口：{FROM_DATE.isoformat()} 至 {TODAY.isoformat()}；以下为自动筛选出的顶会论文摘要，建议再结合全文核验。",
+        f"检索窗口：{FROM_DATE.isoformat()} 至 {TODAY.isoformat()}；中文摘要模型暂不可用，以下先展示自动筛选出的顶会论文摘要原文，建议结合全文核验。",
         "",
     ]
     for index, item in enumerate(items, start=1):
@@ -379,7 +384,7 @@ def fallback_summary(items: list[dict]) -> str:
 
 
 def issue_body(items: list[dict], token: str | None) -> str:
-    content = model_summary(items, token) if token else None
+    content = model_summary(items) if token else None
     if not content:
         content = fallback_summary(items)
     metadata = [
@@ -404,7 +409,7 @@ def issue_body(items: list[dict], token: str | None) -> str:
 
 
 def create_issue(items: list[dict], token: str, repo: str, owner: str):
-    title = f"{ISSUE_PREFIX} {TODAY.isoformat()}｜智能体办公安全"
+    title = f"{ISSUE_PREFIX} {TODAY.isoformat()}｜智能体办公安全" + ("（云端摘要验证）" if TEST_MODE else "")
     body = issue_body(items, token)
     payload = {"title": title, "body": body, "assignees": [owner]}
     try:
@@ -449,7 +454,7 @@ def main():
         print("No new eligible papers were found.")
         return
 
-    issue_title = f"{ISSUE_PREFIX} {TODAY.isoformat()}｜智能体办公安全"
+    issue_title = f"{ISSUE_PREFIX} {TODAY.isoformat()}｜智能体办公安全" + ("（云端摘要验证）" if TEST_MODE else "")
     if issue_title in titles:
         print(f"Issue already exists: {issue_title}")
         return

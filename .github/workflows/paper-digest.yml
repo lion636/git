@@ -14,7 +14,6 @@ on:
 permissions:
   contents: read
   issues: write
-  models: read
 
 concurrency:
   group: paper-digest
@@ -23,7 +22,9 @@ concurrency:
 jobs:
   digest:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    env:
+      OLLAMA_MODEL: qwen2.5:1.5b
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -33,10 +34,31 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Cache Ollama model
+        uses: actions/cache@v4
+        with:
+          path: ~/.ollama/models
+          key: ollama-qwen2.5-1.5b-v1
+
+      - name: Install and start Ollama
+        run: |
+          if ! command -v ollama >/dev/null 2>&1; then
+            curl -fsSL https://ollama.com/install.sh | sh
+          fi
+          nohup ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+          ollama pull "$OLLAMA_MODEL"
+
       - name: Build and publish digest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
           TZ: Asia/Shanghai
+          PAPER_DIGEST_TEST: ${{ github.event_name == 'push' && '1' || '0' }}
         run: python scripts/paper_digest.py
