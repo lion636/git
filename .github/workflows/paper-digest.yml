@@ -1,0 +1,42 @@
+name: Daily agent-security paper digest
+
+on:
+  schedule:
+    # GitHub Actions uses UTC. 00:00 UTC = 08:00 Asia/Shanghai.
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/paper-digest.yml"
+      - "scripts/paper_digest.py"
+
+permissions:
+  contents: read
+  issues: write
+  models: read
+
+concurrency:
+  group: paper-digest
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build and publish digest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          TZ: Asia/Shanghai
+        run: python scripts/paper_digest.py
