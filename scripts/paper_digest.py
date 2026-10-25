@@ -34,6 +34,11 @@ VENUE_RULES = [
     (re.compile(r"\bOSDI\b|Operating Systems Design and Implementation", re.I), "OSDI", 30),
     (re.compile(r"\bSOSP\b|Symposium on Operating Systems Principles", re.I), "SOSP", 30),
     (re.compile(r"\bEuroSys\b", re.I), "EuroSys", 27),
+    (re.compile(r"IEEE European Symposium on Security and Privacy|\bEuroS&P\b", re.I), "IEEE EuroS&P", 30),
+    (re.compile(r"ACM Asia Conference on Computer and Communications Security|\bASIACCS\b", re.I), "ACM ASIACCS", 28),
+    (re.compile(r"Annual Computer Security Applications Conference|\bACSAC\b", re.I), "ACSAC", 27),
+    (re.compile(r"\bRAID\b|Symposium on Research in Attacks, Intrusions and Defenses", re.I), "RAID", 26),
+    (re.compile(r"The Web Conference|\bWWW\b", re.I), "WWW", 23),
     (re.compile(r"Conference on Neural Information Processing Systems|\bNeurIPS\b", re.I), "NeurIPS", 24),
     (re.compile(r"International Conference on Machine Learning\b(?! and)|\bICML\b", re.I), "ICML", 24),
     (re.compile(r"International Conference on Learning Representations|\bICLR\b", re.I), "ICLR", 24),
@@ -53,12 +58,19 @@ VENUE_RULES = [
 
 QUERIES = [
     '"prompt injection" LLM agent',
+    '"indirect prompt injection" agent',
     '"agent security" LLM tool',
     'LLM agent access control permissions',
-    'agent information flow control provenance',
+    'LLM agent authorization capability',
+    'LLM agent privacy data leakage',
     'enterprise office LLM agent security privacy',
     'MCP security tool-using agent',
+    'MCP tool poisoning agent',
     'AI agent sandbox tool execution safety',
+    'agent security benchmark evaluation',
+    'computer use agent security',
+    'agent information flow provenance',
+    'multi-agent security attack defense',
 ]
 
 KEYWORD_WEIGHTS = {
@@ -126,7 +138,7 @@ def openalex_search(query: str):
     params = urllib.parse.urlencode({
         "search": query,
         "filter": f"from_publication_date:{FROM_DATE.isoformat()},to_publication_date:{TODAY.isoformat()}",
-        "per-page": 100,
+        "per-page": 200,
         "select": (
             "id,doi,title,publication_year,publication_date,primary_location,"
             "best_oa_location,authorships,abstract_inverted_index,cited_by_count"
@@ -205,7 +217,7 @@ def collect_candidates():
             if not any(term in text for term in SECURITY_TERMS):
                 continue
             score, matched = score_item(work, *venue_match)
-            if score < 42:
+            if score < 36:
                 continue
             primary = work.get("primary_location") or {}
             best_oa = work.get("best_oa_location") or {}
