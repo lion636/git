@@ -509,7 +509,25 @@ def main():
             break
 
     if not selected:
+        notice_title = f"{ISSUE_PREFIX} {TODAY.isoformat()}｜今日候选不足"
         print("No new eligible papers were found.")
+        if not token or not repo or notice_title in titles:
+            return
+        notice_body = (
+            f"## {TODAY.isoformat()} 论文日报\n\n"
+            f"项目：**{PROJECT}**\n\n"
+            f"今天没有找到满足“最近 12 个月 + 顶会/顶刊 + 高度相关 + 未重复”条件的新论文。\n\n"
+            "为了避免用低相关论文凑数，本次没有生成推荐列表。下一轮定时任务会继续检索。"
+        )
+        payload = {"title": notice_title, "body": notice_body, "assignees": [owner]}
+        try:
+            issue = github_request("POST", f"/repos/{repo}/issues", token, payload)
+        except urllib.error.HTTPError as exc:
+            if exc.code != 422:
+                raise
+            payload.pop("assignees", None)
+            issue = github_request("POST", f"/repos/{repo}/issues", token, payload)
+        print(f"Created shortage notice #{issue.get('number')}: {issue.get('html_url')}")
         return
 
     issue_title = f"{ISSUE_PREFIX} {TODAY.isoformat()}｜智能体办公安全"
